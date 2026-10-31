@@ -7,7 +7,8 @@ import { createInterface } from 'node:readline';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '..');
-const python = process.env.SUMO_PYTHON || resolve(projectRoot, '.venv-sumo', 'Scripts', 'python.exe');
+const python = process.env.SUMO_PYTHON || resolve(projectRoot, '.venv-sumo', ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python']));
+const sumoHome = process.env.SUMO_HOME || (process.platform === 'win32' ? resolve(projectRoot, '.venv-sumo', 'Lib', 'site-packages', 'sumo') : null);
 const workerScript = resolve(here, 'sumo-worker.py');
 const sessions = new Map();
 let cachedStatus;
@@ -32,7 +33,7 @@ function startWorker(simulationId) {
     cwd: projectRoot,
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, SUMO_HOME: resolve(projectRoot, '.venv-sumo', 'Lib', 'site-packages', 'sumo') },
+    env: { ...process.env, ...(sumoHome ? { SUMO_HOME: sumoHome } : {}) },
   });
   const pending = new Map();
   let output = '';

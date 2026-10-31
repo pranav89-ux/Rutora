@@ -72,7 +72,19 @@ $env:ROUTING_URL = 'http://127.0.0.1:5000'
 npm run dev
 ```
 
-`PORT`, `HOST`, `API_PORT`, `ROUTING_URL`, `OVERPASS_URL`, `GEOCODING_URL`, and `WEATHER_URL` are backend configuration. For a public host, set `HOST=0.0.0.0`; platforms such as Render provide `PORT`. `VITE_API_URL` is the public backend origin used by a separately deployed frontend; leave it blank for local Vite proxy use. `SUMO_PYTHON` can point to a custom Python runtime with SUMO, TraCI, and sumolib installed. `VITE_STREET_TILE_URL`, `VITE_SATELLITE_TILE_URL`, and `VITE_SATELLITE_ATTRIBUTION` are frontend configuration and must not contain secrets.
+`PORT`, `HOST`, `API_PORT`, `ROUTING_URL`, `OVERPASS_URL`, `GEOCODING_URL`, and `WEATHER_URL` are backend configuration. For a public host, set `HOST=0.0.0.0`; platforms such as Render provide `PORT`. `VITE_API_URL` is the public backend origin used by a separately deployed frontend; leave it blank for local Vite proxy use or the combined Docker deployment. `SERVE_FRONTEND=true` enables serving the built `dist` folder from the API server. `SUMO_PYTHON` can point to a custom Python runtime with SUMO, TraCI, and sumolib installed; `SUMO_HOME` can point to that installation's SUMO directory. `VITE_STREET_TILE_URL`, `VITE_SATELLITE_TILE_URL`, and `VITE_SATELLITE_ATTRIBUTION` are frontend configuration and must not contain secrets.
+
+## Deploy to Render with Docker
+
+The Dockerfile builds the frontend and installs Python, SUMO 1.28.0, TraCI, and sumolib. The resulting container serves the website and API from one origin. A separate frontend service or `VITE_API_URL` setting is unnecessary for this deployment.
+
+1. Push `Dockerfile`, `.dockerignore`, and the backend changes to GitHub.
+2. In Render, create a **Web Service** connected to this repository and branch `main`.
+3. Choose **Docker** as the language, leave the root directory empty, and use `./Dockerfile` as the Dockerfile path. Leave the Docker Command empty to use the file's startup command.
+4. Set the health check path to `/api/health` and deploy. The image already sets the host, SUMO runtime, and frontend serving configuration; Render supplies the public port.
+5. Open the service URL. `/api/health` should report `engine.available: true` once SUMO is installed successfully.
+
+For a local container build, run `docker build -t rutora .` followed by `docker run --rm -p 8000:8000 rutora`, then open `http://localhost:8000`. Session state is held in process memory, and model caches use container storage; restarting or replacing the container clears sessions and may clear cached models. This setup does not provide a persistent database.
 
 ## Source documents
 

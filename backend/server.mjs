@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { commandSumoSimulation, startSumoSimulation, stopAllSumoSimulations, stopSumoSimulation, sumoStatus } from './sumo-engine.mjs';
@@ -9,6 +9,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const cacheFile = resolve(here, 'data', 'models.json');
 const port = Number(process.env.PORT || process.env.API_PORT || 8000);
 const host = process.env.HOST || '127.0.0.1';
+const frontendDirectory = resolve(here, '../dist');
+const serveFrontend = process.env.SERVE_FRONTEND === 'true';
 const geocodeCache = new Map();
 const models = new Map();
 const simulations = new Map();
@@ -806,6 +808,31 @@ async function getRoute(startLat, startLon, endLat, endLon) {
   }));
 }
 
+async function sendFrontend(req, res, pathname) {
+  let decodedPath;
+  try { decodedPath = decodeURIComponent(pathname); } catch { return send(res, 400, { error: 'Invalid URL path.' }); }
+  const requestedFile = resolve(frontendDirectory, `.${decodedPath}`);
+  if (decodedPath.includes('\0') || (requestedFile !== frontendDirectory && !requestedFile.startsWith(frontendDirectory + sep))) {
+    return send(res, 403, { error: 'Invalid file path.' });
+  }
+  let file = decodedPath.endsWith('/') ? resolve(requestedFile, 'index.html') : requestedFile;
+  let content;
+  try {
+    content = await readFile(file);
+  } catch {
+    if (extname(decodedPath)) return send(res, 404, { error: 'File not found.' });
+    file = resolve(frontendDirectory, 'index.html');
+    try { content = await readFile(file); } catch { return send(res, 503, { error: 'Frontend build is missing. Run npm run build first.' }); }
+  }
+  const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2' };
+  res.writeHead(200, {
+    'Content-Type': types[extname(file)] || 'application/octet-stream',
+    'Content-Length': content.length,
+    'Cache-Control': extname(file) === '.html' ? 'no-cache' : pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
+  });
+  res.end(req.method === 'HEAD' ? undefined : content);
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, {});
   const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
@@ -953,6 +980,9 @@ const server = createServer(async (req, res) => {
         return send(res, 200, simulationSnapshot(simulation));
       }
       if (req.method === 'GET' && !simulationMatch[2]) return send(res, 200, simulationSnapshot(simulation));
+    }
+    if (serveFrontend && (req.method === 'GET' || req.method === 'HEAD') && url.pathname !== '/api' && !url.pathname.startsWith('/api/')) {
+      return await sendFrontend(req, res, url.pathname);
     }
     return send(res, 404, { error: 'Route not found.' });
   } catch (error) {

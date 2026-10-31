@@ -1,0 +1,12 @@
+.git
+.codex-attachments
+.rutora-test-profile
+node_modules
+dist
+.env
+.env.*
+.venv-sumo
+backend/data
+**/__pycache__
+docs
+output
