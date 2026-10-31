@@ -1,0 +1,12 @@
+node_modules/
+.rutora-test-profile/
+dist/
+backend/data/models.json
+backend/data/sumo/
+backend/__pycache__/
+.venv-sumo/
+.env
+.env.*
+!.env.example
+
+.codex-attachments/
