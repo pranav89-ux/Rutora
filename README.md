@@ -72,7 +72,7 @@ $env:ROUTING_URL = 'http://127.0.0.1:5000'
 npm run dev
 ```
 
-`API_PORT`, `ROUTING_URL`, `OVERPASS_URL`, `GEOCODING_URL`, and `WEATHER_URL` are backend configuration. `SUMO_PYTHON` can point to a custom Python runtime with SUMO, TraCI, and sumolib installed. `VITE_STREET_TILE_URL`, `VITE_SATELLITE_TILE_URL`, and `VITE_SATELLITE_ATTRIBUTION` are frontend configuration and must not contain secrets.
+`PORT`, `HOST`, `API_PORT`, `ROUTING_URL`, `OVERPASS_URL`, `GEOCODING_URL`, and `WEATHER_URL` are backend configuration. For a public host, set `HOST=0.0.0.0`; platforms such as Render provide `PORT`. `VITE_API_URL` is the public backend origin used by a separately deployed frontend; leave it blank for local Vite proxy use. `SUMO_PYTHON` can point to a custom Python runtime with SUMO, TraCI, and sumolib installed. `VITE_STREET_TILE_URL`, `VITE_SATELLITE_TILE_URL`, and `VITE_SATELLITE_ATTRIBUTION` are frontend configuration and must not contain secrets.
 
 ## Source documents
 

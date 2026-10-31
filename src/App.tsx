@@ -12,6 +12,12 @@ import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import { incidents, sources, type Incident } from './data';
 
+const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const apiFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const target = typeof input === 'string' && input.startsWith('/api/') ? `${apiBaseUrl}${input}` : input;
+  return fetch(target, init);
+};
+
 type LayerKey = 'Traffic' | 'Incidents' | 'Disaster' | 'Infrastructure';
 const initialLayers: Record<LayerKey, boolean> = { Traffic: true, Incidents: true, Disaster: false, Infrastructure: true };
 const detourPalette = ['#8B5CF6', '#0EA5E9', '#F97316', '#E11D48', '#14B8A6'];
@@ -463,7 +469,7 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/health', { signal: controller.signal }).then(response => response.json()).then(setApiHealth).catch(() => setApiHealth(null));
+    apiFetch('/api/health', { signal: controller.signal }).then(response => response.json()).then(setApiHealth).catch(() => setApiHealth(null));
     return () => controller.abort();
   }, []);
 
@@ -475,7 +481,7 @@ function App() {
       return;
     }
     const controller = new AbortController();
-    const refresh = () => fetch(`/api/weather?latitude=${location.latitude}&longitude=${location.longitude}`, { signal: controller.signal })
+    const refresh = () => apiFetch(`/api/weather?latitude=${location.latitude}&longitude=${location.longitude}`, { signal: controller.signal })
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Weather service is temporarily unavailable.');
@@ -555,7 +561,7 @@ function App() {
     }
     tickTimer.current = window.setInterval(async () => {
       try {
-        const response = await fetch(`/api/simulations/${simulation.id}/tick`);
+        const response = await apiFetch(`/api/simulations/${simulation.id}/tick`);
         if (response.ok) acceptSimulationSnapshot(await response.json() as SimSnapshot);
       } catch { setSimulationError('Simulation connection lost.'); }
     }, 900);
@@ -667,7 +673,7 @@ function App() {
     if (term.length < 2 || locationLoading) return;
     setLocationLoading(true); setLocationError(''); setLocationResults([]); setSearchOpen(true);
     try {
-      const response = await fetch(`/api/geocode?q=${encodeURIComponent(term)}`);
+      const response = await apiFetch(`/api/geocode?q=${encodeURIComponent(term)}`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => null) as { error?: string } | null;
         if (response.status >= 500 && !errorData?.error) throw new Error('The local API is not responding. Stop this terminal and restart with "npm run dev" so the API starts with the app.');
@@ -687,7 +693,7 @@ function App() {
     setSimulationEditorCollapsed(false);
     setBuildingModel(true); setSimulationError('');
     try {
-      const response = await fetch('/api/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, radiusMeters }) });
+      const response = await apiFetch('/api/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, radiusMeters }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Could not build this road model.');
       const roadModel = payload as ModelData;
@@ -695,7 +701,7 @@ function App() {
       let rainMmH = weatherLocationId === location.id ? Number(weatherReport?.current.precipitation) || 0 : 0;
       if (weatherLocationId !== location.id) {
         try {
-          const weatherResponse = await fetch(`/api/weather?latitude=${location.latitude}&longitude=${location.longitude}`);
+          const weatherResponse = await apiFetch(`/api/weather?latitude=${location.latitude}&longitude=${location.longitude}`);
           if (weatherResponse.ok) {
             const freshWeather = await weatherResponse.json() as WeatherReport;
             setWeatherReport(freshWeather);
@@ -704,7 +710,7 @@ function App() {
           }
         } catch { /* The traffic scenario can run with dry-weather assumptions when weather is unavailable. */ }
       }
-      const simResponse = await fetch('/api/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modelId: roadModel.id, trafficVolume: trafficDraft.trafficVolume, rainMmH }) });
+      const simResponse = await apiFetch('/api/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modelId: roadModel.id, trafficVolume: trafficDraft.trafficVolume, rainMmH }) });
       const simPayload = await simResponse.json();
       if (!simResponse.ok) throw new Error(simPayload.error || 'Road model created, but the simulation could not start.');
       setSimulation(simPayload as SimSnapshot);
@@ -721,13 +727,13 @@ function App() {
     setSimulationBusy(true); setSimulationError('');
     try {
       if (simulation?.status === 'playing') {
-        const pauseResponse = await fetch('/api/simulations/' + simulation.id + '/command', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }) });
+        const pauseResponse = await apiFetch('/api/simulations/' + simulation.id + '/command', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pause' }) });
         const pausePayload = await pauseResponse.json() as SimSnapshot & { error?: string };
         if (!pauseResponse.ok) throw new Error(pausePayload.error || 'Pause the current simulation before creating a new one.');
         acceptSimulationSnapshot(pausePayload);
       }
       const rainMmH = weatherLocationId === location?.id ? Number(weatherReport?.current.precipitation) || 0 : 0;
-      const response = await fetch('/api/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modelId: model.id, trafficVolume: trafficDraft.trafficVolume, rainMmH }) });
+      const response = await apiFetch('/api/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ modelId: model.id, trafficVolume: trafficDraft.trafficVolume, rainMmH }) });
       const payload = await response.json() as SimSnapshot & { error?: string };
       if (!response.ok) throw new Error(payload.error || 'Could not create the simulation. Try again.');
       acceptSimulationSnapshot(payload);
@@ -745,7 +751,7 @@ function App() {
     setSimulationBusy(true); setSimulationError('');
     setRoadTrafficError('');
     try {
-      const response = await fetch(`/api/simulations/${simulation.id}/command`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, value }) });
+      const response = await apiFetch(`/api/simulations/${simulation.id}/command`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, value }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Simulation command failed.');
       const snapshot = payload as SimSnapshot;
@@ -910,7 +916,7 @@ function App() {
     if (term.length < 2 || destinationLoading) return;
     setDestinationLoading(true); setRouteError(''); setDestinationResults([]); setDestinationSearchOpen(true);
     try {
-      const response = await fetch(`/api/geocode?q=${encodeURIComponent(term)}`);
+      const response = await apiFetch(`/api/geocode?q=${encodeURIComponent(term)}`);
       const payload = await response.json().catch(() => null) as { results?: LocationResult[]; error?: string } | null;
       if (!response.ok) {
         if (response.status >= 500 && !payload?.error) throw new Error('The local API is not responding. Restart with "npm run dev" so the API starts with the app.');
@@ -950,7 +956,7 @@ function App() {
     setRouteLoading(true); setRouteError(''); setRouteOptions([]); setNavigationActive(false);
     try {
       const params = new URLSearchParams({ startLat: String(origin[0]), startLon: String(origin[1]), endLat: String(destination.latitude), endLon: String(destination.longitude) });
-      const response = await fetch(`/api/route?${params}`);
+      const response = await apiFetch(`/api/route?${params}`);
       const payload = await response.json() as { routes?: RouteOption[]; error?: string };
       if (!response.ok || !payload.routes?.length) throw new Error(payload.error || 'No route could be found between these points.');
       setRouteOptions(payload.routes); setSelectedRouteIndex(0); setNavigationStep(0);
@@ -1415,7 +1421,7 @@ function LocationMap({ location, model, simulation, radiusMeters, route, gpsPosi
     const controller = new AbortController();
     setBuildingFootprints(null);
     setBuildingStatus('loading');
-    fetch(`/api/buildings?latitude=${location.latitude}&longitude=${location.longitude}&radiusMeters=${model?.radiusMeters ?? radiusMeters}`, { signal: controller.signal })
+    apiFetch(`/api/buildings?latitude=${location.latitude}&longitude=${location.longitude}&radiusMeters=${model?.radiusMeters ?? radiusMeters}`, { signal: controller.signal })
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'Building data is unavailable.');

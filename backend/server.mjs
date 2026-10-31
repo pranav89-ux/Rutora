@@ -7,7 +7,8 @@ import { commandSumoSimulation, startSumoSimulation, stopAllSumoSimulations, sto
 
 const here = dirname(fileURLToPath(import.meta.url));
 const cacheFile = resolve(here, 'data', 'models.json');
-const port = Number(process.env.API_PORT || 8000);
+const port = Number(process.env.PORT || process.env.API_PORT || 8000);
+const host = process.env.HOST || '127.0.0.1';
 const geocodeCache = new Map();
 const models = new Map();
 const simulations = new Map();
@@ -962,5 +963,5 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '127.0.0.1', () => console.log(`Rutora API listening at http://127.0.0.1:${port}`));
+server.listen(port, host, () => console.log(`Rutora API listening at http://${host}:${port}`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(async () => { await stopAllSumoSimulations(); process.exit(0); }));
